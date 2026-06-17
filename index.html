@@ -57,7 +57,8 @@
     .jour-list{ display:grid; gap:8px; margin:8px 0 4px; }
     .jour-item{ background:#fff; border:1px solid var(--line); border-left:5px solid var(--jc,#999); border-radius:11px; padding:10px 12px; font-size:.9rem; display:flex; align-items:center; gap:10px; }
     .jour-item .meta2{ font-size:.78rem; color:var(--soft); }
-    .jour-item .x{ margin-left:auto; border:none; background:none; color:var(--soft); cursor:pointer; font-size:1.15rem; }
+    .jour-item .mod{ margin-left:auto; border:1.5px solid var(--line); background:#fff; color:var(--accent); border-radius:8px; padding:5px 11px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    .jour-item .x{ border:none; background:none; color:var(--soft); cursor:pointer; font-size:1.25rem; line-height:1; padding:0 2px; }
     .addbtn{ width:100%; background:rgba(47,125,107,.12); color:var(--accent); border:none; border-radius:11px; padding:12px; font:inherit; font-weight:650; cursor:pointer; margin-top:8px; }
 
     .day{ border:1px solid var(--line); border-left:5px solid var(--jc,var(--accent)); border-radius:16px; padding:13px 15px; margin-bottom:13px; }
@@ -317,19 +318,30 @@
       durH.onchange=()=>{ lirAutre(); renderList(); }; durM.onchange=()=>{ lirAutre(); renderList(); };
 
       const jours=[]; const listEl=document.getElementById("jour-list");
+      const toHHMM = m => pad(Math.floor(m/60))+":"+pad(m%60);
+      const recolor = () => jours.forEach((j,i)=>j.col=DAYCOL[i%DAYCOL.length]);
       function renderList(){
         listEl.innerHTML = jours.map((j,i)=>{ const n=genCreneaux(j.start,j.end,duree).length;
           return `<div class="jour-item" style="--jc:${j.col}"><div><div>${esc(j.jour)}</div>
             <div class="meta2">${fmtH(j.start)} – ${fmtH(j.end)} · ${n} créneau${n>1?"x":""}</div></div>
+            <button class="mod" data-i="${i}" type="button">Modifier</button>
             <button class="x" data-i="${i}" type="button" aria-label="Retirer">×</button></div>`; }).join("");
-        listEl.querySelectorAll(".x").forEach(b=>b.onclick=()=>{ jours.splice(+b.dataset.i,1); renderList(); valide(); });
+        listEl.querySelectorAll(".x").forEach(b=>b.onclick=()=>{ jours.splice(+b.dataset.i,1); recolor(); renderList(); valide(); });
+        listEl.querySelectorAll(".mod").forEach(b=>b.onclick=()=>{ const j=jours[+b.dataset.i];
+          document.getElementById("j-date").value=j.dateStr;
+          document.getElementById("j-deb").value=toHHMM(j.start);
+          document.getElementById("j-fin").value=toHHMM(j.end);
+          jours.splice(+b.dataset.i,1); recolor(); renderList(); valide();
+          document.getElementById("j-date").scrollIntoView({block:"center"});
+          toast("Modifiez le jour ou les heures, puis « Ajouter ce jour »."); });
       }
       document.getElementById("j-add").onclick=()=>{
         const date=document.getElementById("j-date").value; if(!date){ toast("Choisissez un jour."); return; }
         const start=toMin(document.getElementById("j-deb").value), end=toMin(document.getElementById("j-fin").value);
         if(end-start<duree){ toast("La plage est plus courte que la durée choisie."); return; }
-        const L=libelle(date); jours.push({dateStr:date,jour:L.jour,d:L.d,m:L.m,start,end,col:DAYCOL[jours.length%DAYCOL.length]});
-        renderList(); valide();
+        const L=libelle(date); jours.push({dateStr:date,jour:L.jour,d:L.d,m:L.m,start,end,col:"#999"});
+        jours.sort((a,b)=> a.dateStr.localeCompare(b.dateStr) || a.start-b.start);
+        recolor(); renderList(); valide();
       };
       const entEl=document.getElementById("f-ent");
       function valide(){ document.getElementById("creer").disabled=!(entEl.value.trim() && type && duree>=5 && jours.length>=1); }
