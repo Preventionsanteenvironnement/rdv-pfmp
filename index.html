@@ -147,6 +147,8 @@
     .item.rub{ width:100%; text-align:left; font:inherit; background:#fff; cursor:pointer; }
     .countbadge{ margin-left:auto; background:var(--accent); color:#fff; border-radius:999px; padding:2px 11px; font-size:.85rem; font-weight:700; }
     .linkback{ background:none; border:none; color:var(--accent); font:inherit; font-size:.92rem; font-weight:650; cursor:pointer; padding:4px 0; margin-bottom:4px; }
+    .item .l2.mail{ color:var(--ink); font-weight:600; word-break:break-all; }
+    .item .l3{ font-size:.84rem; color:var(--soft); margin-top:3px; }
   </style>
 </head>
 <body>
@@ -522,8 +524,10 @@
         if(d.confirme){ chip=`<span class="status ok" style="margin-left:auto"><span class="pin"></span>${past?"Passé":"Confirmé"}</span>`; info=`${esc(d.confirme.jour)} · ${esc(d.confirme.label)}`; }
         else if(d.choix&&d.choix.prefs&&d.choix.prefs.length){ chip=`<span class="status rep" style="margin-left:auto"><span class="pin"></span>À confirmer</span>`; info=`${d.choix.prefs.length} préférence${d.choix.prefs.length>1?"s":""} reçue${d.choix.prefs.length>1?"s":""}`; }
         else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Lien envoyé — pas encore de réponse`; }
+        const mail=(d.choix&&d.choix.contact&&d.choix.contact.value)||d.tuteurEmail||"";
         return `<a class="item ${past?"past":""}" href="?r=${d.id}"><div class="l1"><span class="ent">${esc(d.entreprise)}</span>${chip}</div>
-          <div class="l2">${d.tuteur?esc(d.tuteur)+" — ":""}${info}</div></a>`; };
+          ${mail?`<div class="l2 mail">${esc(mail)}</div>`:""}
+          <div class="l3">${d.tuteur?esc(d.tuteur)+" · ":""}${info}</div></a>`; };
       const sortKey=d=>d.confirme?new Date(d.confirme.dateStr).getTime():(1e15-(d.createdAt?.seconds||0));
 
       // rubriques = filières (dossiers)
