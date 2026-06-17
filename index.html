@@ -123,6 +123,27 @@
     .toast{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); background:#1c2530; color:#fff; padding:11px 18px; border-radius:10px; font-size:.86rem; opacity:0; pointer-events:none; transition:.25s; z-index:9; }
     .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
     .hidden{ display:none !important; }
+
+    /* lisibilité mobile — police agrandie */
+    .intro{ font-size:1.06rem; }
+    .recap .row{ font-size:.98rem; }
+    .ask{ font-size:1.1rem; }
+    .sub{ font-size:.9rem; }
+    .chip{ font-size:1rem; padding:11px 15px; }
+    .day-h .lbl{ font-size:1.06rem; }
+    .day-h .win{ font-size:.86rem; }
+    .legend{ font-size:.85rem; }
+    .pref .pj{ font-size:1.02rem; } .pref .ph{ font-size:.9rem; }
+    .item .ent{ font-size:1.05rem; } .item .l2{ font-size:.9rem; }
+    .bigmail{ width:100%; font:inherit; font-size:1.08rem; padding:14px; border:1.5px solid var(--line);
+      border-radius:12px; background:#fff; color:var(--ink); margin-top:2px; }
+    .bigmail:focus{ border-color:var(--accent); outline:none; box-shadow:0 0 0 3px rgba(47,125,107,.14); }
+    @media (max-width:430px){ .top h1{ font-size:1.4rem; } .intro{ font-size:1.1rem; } .chip{ font-size:1.04rem; } }
+
+    .filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+    .fchip{ border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:8px 15px; font:inherit; font-size:.92rem; cursor:pointer; transition:.13s; }
+    .fchip:hover{ border-color:var(--accent); } .fchip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    .filtag{ display:inline-block; background:rgba(47,125,107,.12); color:var(--accent); border-radius:6px; padding:1px 8px; font-size:.78rem; font-weight:700; margin-right:6px; }
   </style>
 </head>
 <body>
@@ -215,6 +236,12 @@
           <div class="label">PFMP · visite de stage</div><h1>Proposer une date au tuteur</h1></div>
         <div class="body">
           <div class="field"><label>Structure / entreprise</label><input id="f-ent" placeholder="ex. Centre social Les Tilleuls"></div>
+          <div class="field"><label>Filière <span style="font-weight:400;color:var(--soft)">— pour ranger vos rendez-vous</span></label>
+            <div class="seg" id="seg-fil">
+              <button data-v="MELEC">MELEC</button><button data-v="AGOrA">AGOrA</button>
+              <button data-v="CAP PSR">CAP PSR</button><button data-v="__autre">Autre…</button>
+            </div>
+            <input id="f-fil-autre" class="hidden" placeholder="Précisez la filière (ex. CAP EPC)" style="margin-top:8px"></div>
           <div class="field"><label>E-mail du tuteur <span style="font-weight:400;color:var(--soft)">— pour la confirmation</span></label>
             <input id="f-temail" type="email" placeholder="facultatif"><div class="hint">Le tuteur pourra le vérifier / corriger.</div></div>
           <div class="field"><label>Nom du tuteur <span style="font-weight:400;color:var(--soft)">— facultatif</span></label><input id="f-tut" placeholder="facultatif"></div>
@@ -261,6 +288,13 @@
         if(b.dataset.v==="__autre"){ autre.classList.remove("hidden"); autre.focus(); type=autre.value.trim(); } else { autre.classList.add("hidden"); type=b.dataset.v; } valide(); });
       autre.addEventListener("input",()=>{ type=autre.value.trim(); valide(); });
 
+      let filiere="";
+      const segF=document.getElementById("seg-fil"), filAutre=document.getElementById("f-fil-autre");
+      segF.querySelectorAll("button").forEach(b=>b.onclick=()=>{ segF.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+        if(b.dataset.v==="__autre"){ filAutre.classList.remove("hidden"); filAutre.focus(); filiere=filAutre.value.trim(); }
+        else { filAutre.classList.add("hidden"); filiere=b.dataset.v; } });
+      filAutre.addEventListener("input",()=>{ filiere=filAutre.value.trim(); });
+
       let duree=45;
       const segD=document.getElementById("seg-dur"), durAutre=document.getElementById("dur-autre"),
             durH=document.getElementById("dur-h"), durM=document.getElementById("dur-m");
@@ -293,7 +327,7 @@
         const btn=document.getElementById("creer"); btn.disabled=true; btn.textContent="Création…";
         const payload={ enseignant:document.getElementById("f-ens").value.trim(), tuteur:document.getElementById("f-tut").value.trim(),
           tuteurEmail:document.getElementById("f-temail").value.trim(),
-          entreprise:entEl.value.trim(), type, duree,
+          entreprise:entEl.value.trim(), filiere, type, duree,
           jours:jours.map(j=>({dateStr:j.dateStr,jour:j.jour,d:j.d,m:j.m,start:j.start,end:j.end,col:j.col})),
           choix:null, confirme:null, statut:"attente", createdAt:serverTimestamp() };
         try{ const ref=await addDoc(collection(db,COL),payload); localStorage.setItem(lsAdmin(ref.id),"1"); location.search="?r="+ref.id; }
@@ -320,13 +354,10 @@
           <p class="sub">Le 1<sup>er</sup> touché est votre choix idéal. Touchez-en plusieurs ; re-touchez pour retirer.</p>
           <div class="legend"><span><i style="background:#1f9d57"></i>1ᵉʳ</span><span><i style="background:#2f80b5"></i>2ᵉ</span><span><i style="background:#7a5cc0"></i>3ᵉ</span><span><i style="background:#c77d2b"></i>4ᵉ+</span></div>
           <div id="jours"></div>
-          <p class="ask" style="margin-top:6px">Recevoir la confirmation</p>
-          <p class="sub">L'enseignant vous confirmera un créneau. Comment souhaitez-vous être prévenu ?</p>
-          <div class="seg" id="seg-contact">
-            <button data-m="email">Par e-mail</button><button data-m="none">Plus tard</button>
-          </div>
-          <input id="contact-val" class="hidden" style="margin-top:8px">
-          <div class="hint" id="contact-hint"></div>
+          <p class="ask" style="margin-top:6px">Votre e-mail</p>
+          <p class="sub">Pour recevoir la confirmation de votre rendez-vous.</p>
+          <input id="contact-val" type="email" inputmode="email" autocomplete="email" class="bigmail" placeholder="prenom.nom@exemple.fr">
+          <div class="hint" id="contact-hint">Vérifiez bien votre adresse avant d'envoyer.</div>
           <button class="cta" id="ok" disabled>Envoyer mes préférences</button>
         </div>
         <div class="foot">Aucune inscription — vos préférences sont transmises directement à l'enseignant.</div>`;
@@ -343,24 +374,21 @@
           </div>`).join("");
         wrap.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ const ji=+b.dataset.j, s=+b.dataset.s, k=key(ji,s); const i=prefs.findIndex(p=>p.key===k);
           if(i>=0) prefs.splice(i,1); else { const j=d.jours[ji]; prefs.push({key:k,dateStr:j.dateStr,jour:j.jour,d:j.d,m:j.m,start:s,end:+b.dataset.e,label:b.dataset.l}); }
-          paint(); ok.disabled=prefs.length===0; });
+          paint(); maj(); });
       }
-      paint();
 
-      // contact e-mail pré-rempli (vérifiable / corrigeable)
-      let cmode = d.tuteurEmail ? "email" : "none";
-      const segC=document.getElementById("seg-contact"), cval=document.getElementById("contact-val"), chint=document.getElementById("contact-hint");
-      function applyContact(){ segC.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.m===cmode));
-        if(cmode==="none"){ cval.classList.add("hidden"); chint.textContent=""; }
-        else { cval.classList.remove("hidden"); cval.type="email"; cval.placeholder="votre e-mail";
-          cval.value = d.tuteurEmail||""; chint.textContent="Vérifiez et corrigez si besoin."; } }
-      segC.querySelectorAll("button").forEach(b=>b.onclick=()=>{ cmode=b.dataset.m; applyContact(); if(cmode!=="none") cval.focus(); });
-      applyContact();
+      // e-mail pré-rempli, vérifiable / corrigeable — requis pour la confirmation
+      const cval=document.getElementById("contact-val");
+      cval.value = d.tuteurEmail || "";
+      const emailOK = () => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cval.value.trim());
+      const maj = () => { ok.disabled = !(prefs.length>0 && emailOK()); };
+      cval.addEventListener("input", maj);
+      paint(); maj();
 
       ok.onclick=async()=>{ ok.disabled=true; ok.textContent="Envoi…";
-        const choix={ prefs:prefs.map(({key,...p})=>p), contact:{mode:cmode, value:cmode==="none"?"":cval.value.trim()} };
+        const choix={ prefs:prefs.map(({key,...p})=>p), contact:{mode:"email", value:cval.value.trim()} };
         try{ await updateDoc(doc(db,COL,id),{ choix, statut:"repondu", respondedAt:serverTimestamp() }); confirmation(choix, false); }
-        catch(e){ ok.disabled=false; ok.textContent="Envoyer mes préférences"; toast("Erreur d'envoi. Réessayez."); }
+        catch(e){ ok.textContent="Envoyer mes préférences"; maj(); toast("Erreur d'envoi. Réessayez."); }
       };
     }
 
@@ -419,7 +447,7 @@
             <a class="cta ghost" href="${icsHref(d)}" download="rendez-vous-pfmp.ics" style="display:block;text-decoration:none">Ajouter à mon agenda</a>
             <button class="cta ghost" id="rouvrir">Changer de créneau</button>`;
         } else if(prefs.length){
-          statutHtml=`<span class="status rep"><span class="pin"></span>La tutrice a répondu</span>`;
+          statutHtml=`<span class="status rep"><span class="pin"></span>Le tuteur (tutrice) a répondu</span>`;
           corps=`<p class="sub">Ses préférences, classées. Touchez celle que vous retenez pour confirmer le rendez-vous.</p>
             ${prefs.map((p,i)=>{ const c=prio(i+1); return `<button class="pref" data-i="${i}"><div class="rkb" style="background:${c.c}">${i+1}</div>
               <div><div class="pj">${esc(p.jour)}</div><div class="ph">${esc(p.label)} · ${c.t}</div></div><span class="go">Confirmer →</span></button>`; }).join("")}
@@ -427,7 +455,7 @@
             <div class="link-box" style="margin-top:14px"><input id="lien" readonly value="${esc(url)}"><button class="copy" id="copy">Copier</button></div>`;
         } else {
           statutHtml=`<span class="status wait"><span class="pin"></span>En attente de réponse</span>`;
-          corps=`<p class="ask">Lien à envoyer à la tutrice</p>
+          corps=`<p class="ask">Lien à envoyer au tuteur (tutrice)</p>
             <div class="link-box"><input id="lien" readonly value="${esc(url)}"><button class="copy" id="copy">Copier</button></div>
             <p class="hint" style="margin-top:6px">À coller dans votre e-mail au tuteur. Aucun compte à créer pour lui. Cette page se met à jour dès qu'il répond.</p>`;
         }
@@ -435,6 +463,7 @@
           <div class="top"><a class="back" href="?suivi">← Mes rendez-vous</a><div class="label">Visite de stage</div><h1>${esc(d.entreprise)}</h1></div>
           <div class="body">
             <div class="recap">
+              ${d.filiere?`<div class="row"><span class="k">Filière</span><span class="v">${esc(d.filiere)}</span></div>`:""}
               ${d.tuteur?`<div class="row"><span class="k">Tuteur</span><span class="v">${esc(d.tuteur)}</span></div>`:""}
               <div class="row"><span class="k">Type</span><span class="v">${esc(d.type)} · ${d.duree} min</span></div></div>
             <div style="margin-bottom:14px">${statutHtml}</div>
@@ -483,21 +512,36 @@
       const today=new Date(); today.setHours(0,0,0,0);
       const all=docs.filter(Boolean);
       const isPast=d=>d.confirme && new Date(d.confirme.dateStr+"T00:00:00")<today;
+      const filVal=d=>d.filiere||"";
       const carte=d=>{ let chip,info; const past=isPast(d);
         if(d.confirme){ chip=`<span class="status ok" style="margin-left:auto"><span class="pin"></span>${past?"Passé":"Confirmé"}</span>`; info=`${esc(d.confirme.jour)} · ${esc(d.confirme.label)}`; }
         else if(d.choix&&d.choix.prefs&&d.choix.prefs.length){ chip=`<span class="status rep" style="margin-left:auto"><span class="pin"></span>À confirmer</span>`; info=`${d.choix.prefs.length} préférence${d.choix.prefs.length>1?"s":""} reçue${d.choix.prefs.length>1?"s":""}`; }
         else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Lien envoyé — pas encore de réponse`; }
+        const fil = filVal(d) ? `<span class="filtag">${esc(filVal(d))}</span>` : "";
         return `<a class="item ${past?"past":""}" href="?r=${d.id}"><div class="l1"><span class="ent">${esc(d.entreprise)}</span>${chip}</div>
-          <div class="l2">${d.tuteur?esc(d.tuteur)+" — ":""}${info}</div></a>`; };
-      // tri : à venir par date de RDV croissante puis création ; passés du plus récent au plus ancien
+          <div class="l2">${fil}${d.tuteur?esc(d.tuteur)+" — ":""}${info}</div></a>`; };
       const sortKey=d=>d.confirme?new Date(d.confirme.dateStr).getTime():(1e15-(d.createdAt?.seconds||0));
-      const avenir=all.filter(d=>!isPast(d)).sort((a,b)=>sortKey(a)-sortKey(b));
-      const passes=all.filter(isPast).sort((a,b)=>new Date(b.confirme.dateStr)-new Date(a.confirme.dateStr));
-      liste.innerHTML =
-        (avenir.length?`<div class="grp">À venir & à traiter</div>`+avenir.map(carte).join(""):"")
-        + (passes.length?`<div class="grp">Passés</div>`+passes.map(carte).join(""):"")
-        + `<button class="cta" id="nouv" style="margin-top:12px">Créer un rendez-vous</button>`;
-      document.getElementById("nouv").onclick=()=>{ location.search=""; };
+      const named=[...new Set(all.map(filVal).filter(Boolean))].sort();
+      const hasVide=all.some(d=>!filVal(d));
+      let cur="__all";
+      function renderListe(){
+        const sel=all.filter(d=> cur==="__all" ? true : (cur==="__none" ? !filVal(d) : filVal(d)===cur));
+        const avenir=sel.filter(d=>!isPast(d)).sort((a,b)=>sortKey(a)-sortKey(b));
+        const passes=sel.filter(isPast).sort((a,b)=>new Date(b.confirme.dateStr)-new Date(a.confirme.dateStr));
+        const chips=(named.length||hasVide)?`<div class="filters">`
+          +`<button class="fchip ${cur==='__all'?'on':''}" data-f="__all">Toutes</button>`
+          +named.map(f=>`<button class="fchip ${cur===f?'on':''}" data-f="${esc(f)}">${esc(f)}</button>`).join("")
+          +(hasVide?`<button class="fchip ${cur==='__none'?'on':''}" data-f="__none">Sans filière</button>`:"")
+          +`</div>`:"";
+        liste.innerHTML = chips
+          + (avenir.length?`<div class="grp">À venir & à traiter</div>`+avenir.map(carte).join(""):"")
+          + (passes.length?`<div class="grp">Passés</div>`+passes.map(carte).join(""):"")
+          + (!avenir.length&&!passes.length?`<p class="sub" style="font-size:.92rem">Aucun rendez-vous ici.</p>`:"")
+          + `<button class="cta" id="nouv" style="margin-top:12px">Créer un rendez-vous</button>`;
+        liste.querySelectorAll(".fchip").forEach(b=>b.onclick=()=>{ cur=b.dataset.f; renderListe(); });
+        document.getElementById("nouv").onclick=()=>{ location.search=""; };
+      }
+      renderListe();
     }
 
     router();
