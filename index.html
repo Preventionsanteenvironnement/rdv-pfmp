@@ -505,8 +505,10 @@
 
     // ===================================================================  4) SUIVI
     async function vueSuivi(){
+      const selF = params.get("f");
       const ids=Object.keys(localStorage).filter(k=>k.startsWith("coordrdv_admin_")).map(k=>k.slice("coordrdv_admin_".length));
-      app$.innerHTML=`<div class="top"><a class="back" href="${PORTAIL}">← Portail</a><div class="label">Espace de gestion</div><h1>Mes rendez-vous PFMP</h1></div>
+      app$.innerHTML=`<div class="top">${selF!==null?`<a class="back" href="?suivi">← Filières</a>`:`<a class="back" href="${PORTAIL}">← Portail</a>`}
+        <div class="label">Espace de gestion${selF!==null?" · filière":""}</div><h1>${selF!==null?esc(selF):"Mes rendez-vous PFMP"}</h1></div>
         <div class="body" id="liste"><div class="center"><div class="spin"></div>Chargement…</div></div>`;
       const liste=document.getElementById("liste");
       if(!ids.length){ liste.innerHTML=`<p class="sub" style="font-size:.92rem">Aucun rendez-vous pour l'instant.</p><button class="cta" id="nouv">Créer un rendez-vous</button>`;
@@ -528,32 +530,29 @@
       const parFil={}; all.forEach(d=>{ const f=filVal(d); (parFil[f]=parFil[f]||[]).push(d); });
       const noms=Object.keys(parFil).sort((a,b)=> a==="Sans filière"?1 : b==="Sans filière"?-1 : a.localeCompare(b,"fr"));
 
-      function rubriques(){
-        const cards=noms.map(f=>{ const list=parFil[f];
-          const aTraiter=list.filter(d=>!d.confirme && d.choix && d.choix.prefs && d.choix.prefs.length).length;
-          const enAttente=list.filter(d=>!d.confirme && !(d.choix&&d.choix.prefs&&d.choix.prefs.length)).length;
-          const note = aTraiter?`${aTraiter} à confirmer` : (enAttente?`${enAttente} en attente` : "à jour");
-          return `<button class="item rub" data-f="${esc(f)}"><div class="l1"><span class="ent">${esc(f)}</span>
-            <span class="countbadge">${list.length}</span></div><div class="l2">${list.length} rendez-vous · ${note} →</div></button>`; }).join("");
-        liste.innerHTML = `<p class="sub" style="font-size:.92rem">Choisissez une filière pour voir ses rendez-vous.</p>`
-          + cards + `<button class="cta" id="nouv" style="margin-top:14px">Créer un rendez-vous</button>`;
-        liste.querySelectorAll(".rub").forEach(b=>b.onclick=()=>appts(b.dataset.f));
-        document.getElementById("nouv").onclick=()=>{ location.search=""; };
-      }
-      function appts(f){
-        const list=parFil[f]||[];
+      // PAGE d'une filière (URL ?suivi&f=...) — vraie page, retour navigateur OK
+      if(selF!==null){
+        const list=parFil[selF]||[];
         const avenir=list.filter(d=>!isPast(d)).sort((a,b)=>sortKey(a)-sortKey(b));
         const passes=list.filter(isPast).sort((a,b)=>new Date(b.confirme.dateStr)-new Date(a.confirme.dateStr));
-        liste.innerHTML = `<button class="linkback" id="retour">← Filières</button>`
-          + `<div class="grp" style="margin-top:2px">${esc(f)}</div>`
-          + (avenir.length?`<div class="grp">À venir & à traiter</div>`+avenir.map(carte).join(""):"")
+        liste.innerHTML =
+          (avenir.length?`<div class="grp">À venir & à traiter</div>`+avenir.map(carte).join(""):"")
           + (passes.length?`<div class="grp">Passés</div>`+passes.map(carte).join(""):"")
-          + (!list.length?`<p class="sub" style="font-size:.92rem">Aucun rendez-vous.</p>`:"")
+          + (!list.length?`<p class="sub" style="font-size:.92rem">Aucun rendez-vous dans cette filière.</p>`:"")
           + `<button class="cta" id="nouv" style="margin-top:12px">Créer un rendez-vous</button>`;
-        document.getElementById("retour").onclick=rubriques;
         document.getElementById("nouv").onclick=()=>{ location.search=""; };
+        return;
       }
-      rubriques();
+      // PAGE des rubriques (filières) — chaque filière est un lien vers sa page
+      const cards=noms.map(f=>{ const list=parFil[f];
+        const aTraiter=list.filter(d=>!d.confirme && d.choix && d.choix.prefs && d.choix.prefs.length).length;
+        const enAttente=list.filter(d=>!d.confirme && !(d.choix&&d.choix.prefs&&d.choix.prefs.length)).length;
+        const note = aTraiter?`${aTraiter} à confirmer` : (enAttente?`${enAttente} en attente` : "à jour");
+        return `<a class="item rub" href="?suivi&f=${encodeURIComponent(f)}"><div class="l1"><span class="ent">${esc(f)}</span>
+          <span class="countbadge">${list.length}</span></div><div class="l2">${list.length} rendez-vous · ${note} →</div></a>`; }).join("");
+      liste.innerHTML = `<p class="sub" style="font-size:.92rem">Choisissez une filière pour voir ses rendez-vous.</p>`
+        + cards + `<button class="cta" id="nouv" style="margin-top:14px">Créer un rendez-vous</button>`;
+      document.getElementById("nouv").onclick=()=>{ location.search=""; };
     }
 
     router();
