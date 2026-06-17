@@ -144,6 +144,9 @@
     .fchip{ border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:8px 15px; font:inherit; font-size:.92rem; cursor:pointer; transition:.13s; }
     .fchip:hover{ border-color:var(--accent); } .fchip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
     .filtag{ display:inline-block; background:rgba(47,125,107,.12); color:var(--accent); border-radius:6px; padding:1px 8px; font-size:.78rem; font-weight:700; margin-right:6px; }
+    .item.rub{ width:100%; text-align:left; font:inherit; background:#fff; cursor:pointer; }
+    .countbadge{ margin-left:auto; background:var(--accent); color:#fff; border-radius:999px; padding:2px 11px; font-size:.85rem; font-weight:700; }
+    .linkback{ background:none; border:none; color:var(--accent); font:inherit; font-size:.92rem; font-weight:650; cursor:pointer; padding:4px 0; margin-bottom:4px; }
   </style>
 </head>
 <body>
@@ -512,36 +515,45 @@
       const today=new Date(); today.setHours(0,0,0,0);
       const all=docs.filter(Boolean);
       const isPast=d=>d.confirme && new Date(d.confirme.dateStr+"T00:00:00")<today;
-      const filVal=d=>d.filiere||"";
+      const filVal=d=>d.filiere||"Sans filière";
       const carte=d=>{ let chip,info; const past=isPast(d);
         if(d.confirme){ chip=`<span class="status ok" style="margin-left:auto"><span class="pin"></span>${past?"Passé":"Confirmé"}</span>`; info=`${esc(d.confirme.jour)} · ${esc(d.confirme.label)}`; }
         else if(d.choix&&d.choix.prefs&&d.choix.prefs.length){ chip=`<span class="status rep" style="margin-left:auto"><span class="pin"></span>À confirmer</span>`; info=`${d.choix.prefs.length} préférence${d.choix.prefs.length>1?"s":""} reçue${d.choix.prefs.length>1?"s":""}`; }
         else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Lien envoyé — pas encore de réponse`; }
-        const fil = filVal(d) ? `<span class="filtag">${esc(filVal(d))}</span>` : "";
         return `<a class="item ${past?"past":""}" href="?r=${d.id}"><div class="l1"><span class="ent">${esc(d.entreprise)}</span>${chip}</div>
-          <div class="l2">${fil}${d.tuteur?esc(d.tuteur)+" — ":""}${info}</div></a>`; };
+          <div class="l2">${d.tuteur?esc(d.tuteur)+" — ":""}${info}</div></a>`; };
       const sortKey=d=>d.confirme?new Date(d.confirme.dateStr).getTime():(1e15-(d.createdAt?.seconds||0));
-      const named=[...new Set(all.map(filVal).filter(Boolean))].sort();
-      const hasVide=all.some(d=>!filVal(d));
-      let cur="__all";
-      function renderListe(){
-        const sel=all.filter(d=> cur==="__all" ? true : (cur==="__none" ? !filVal(d) : filVal(d)===cur));
-        const avenir=sel.filter(d=>!isPast(d)).sort((a,b)=>sortKey(a)-sortKey(b));
-        const passes=sel.filter(isPast).sort((a,b)=>new Date(b.confirme.dateStr)-new Date(a.confirme.dateStr));
-        const chips=(named.length||hasVide)?`<div class="filters">`
-          +`<button class="fchip ${cur==='__all'?'on':''}" data-f="__all">Toutes</button>`
-          +named.map(f=>`<button class="fchip ${cur===f?'on':''}" data-f="${esc(f)}">${esc(f)}</button>`).join("")
-          +(hasVide?`<button class="fchip ${cur==='__none'?'on':''}" data-f="__none">Sans filière</button>`:"")
-          +`</div>`:"";
-        liste.innerHTML = chips
-          + (avenir.length?`<div class="grp">À venir & à traiter</div>`+avenir.map(carte).join(""):"")
-          + (passes.length?`<div class="grp">Passés</div>`+passes.map(carte).join(""):"")
-          + (!avenir.length&&!passes.length?`<p class="sub" style="font-size:.92rem">Aucun rendez-vous ici.</p>`:"")
-          + `<button class="cta" id="nouv" style="margin-top:12px">Créer un rendez-vous</button>`;
-        liste.querySelectorAll(".fchip").forEach(b=>b.onclick=()=>{ cur=b.dataset.f; renderListe(); });
+
+      // rubriques = filières (dossiers)
+      const parFil={}; all.forEach(d=>{ const f=filVal(d); (parFil[f]=parFil[f]||[]).push(d); });
+      const noms=Object.keys(parFil).sort((a,b)=> a==="Sans filière"?1 : b==="Sans filière"?-1 : a.localeCompare(b,"fr"));
+
+      function rubriques(){
+        const cards=noms.map(f=>{ const list=parFil[f];
+          const aTraiter=list.filter(d=>!d.confirme && d.choix && d.choix.prefs && d.choix.prefs.length).length;
+          const enAttente=list.filter(d=>!d.confirme && !(d.choix&&d.choix.prefs&&d.choix.prefs.length)).length;
+          const note = aTraiter?`${aTraiter} à confirmer` : (enAttente?`${enAttente} en attente` : "à jour");
+          return `<button class="item rub" data-f="${esc(f)}"><div class="l1"><span class="ent">${esc(f)}</span>
+            <span class="countbadge">${list.length}</span></div><div class="l2">${list.length} rendez-vous · ${note} →</div></button>`; }).join("");
+        liste.innerHTML = `<p class="sub" style="font-size:.92rem">Choisissez une filière pour voir ses rendez-vous.</p>`
+          + cards + `<button class="cta" id="nouv" style="margin-top:14px">Créer un rendez-vous</button>`;
+        liste.querySelectorAll(".rub").forEach(b=>b.onclick=()=>appts(b.dataset.f));
         document.getElementById("nouv").onclick=()=>{ location.search=""; };
       }
-      renderListe();
+      function appts(f){
+        const list=parFil[f]||[];
+        const avenir=list.filter(d=>!isPast(d)).sort((a,b)=>sortKey(a)-sortKey(b));
+        const passes=list.filter(isPast).sort((a,b)=>new Date(b.confirme.dateStr)-new Date(a.confirme.dateStr));
+        liste.innerHTML = `<button class="linkback" id="retour">← Filières</button>`
+          + `<div class="grp" style="margin-top:2px">${esc(f)}</div>`
+          + (avenir.length?`<div class="grp">À venir & à traiter</div>`+avenir.map(carte).join(""):"")
+          + (passes.length?`<div class="grp">Passés</div>`+passes.map(carte).join(""):"")
+          + (!list.length?`<p class="sub" style="font-size:.92rem">Aucun rendez-vous.</p>`:"")
+          + `<button class="cta" id="nouv" style="margin-top:12px">Créer un rendez-vous</button>`;
+        document.getElementById("retour").onclick=rubriques;
+        document.getElementById("nouv").onclick=()=>{ location.search=""; };
+      }
+      rubriques();
     }
 
     router();
