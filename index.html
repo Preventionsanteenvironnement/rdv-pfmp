@@ -357,6 +357,32 @@
         try{ const ref=await addDoc(collection(db,COL),payload); localStorage.setItem(lsAdmin(ref.id),"1"); location.search="?r="+ref.id; }
         catch(e){ btn.disabled=false; btn.textContent="Créer et obtenir le lien"; toast("Erreur à l'enregistrement. Réessayez."); }
       };
+
+      // Reprise d'un modèle (duplication d'un rendez-vous existant)
+      try {
+        const tpl = JSON.parse(sessionStorage.getItem("coordrdv_tpl") || "null");
+        if (tpl) {
+          sessionStorage.removeItem("coordrdv_tpl");
+          document.getElementById("f-ens").value = tpl.enseignant || "";
+          document.getElementById("f-tut").value = tpl.tuteur || "";
+          document.getElementById("f-temail").value = tpl.tuteurEmail || "";
+          entEl.value = tpl.entreprise || "";
+          const pick = (seg, val, autreEl) => { seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+            const b=[...seg.querySelectorAll("button")].find(x=>x.dataset.v===String(val));
+            if (b) b.classList.add("on");
+            else if (val) { seg.querySelector('[data-v="__autre"]').classList.add("on"); autreEl.classList.remove("hidden"); autreEl.value=val; } };
+          if (tpl.type) { pick(segT, tpl.type, autre); type = tpl.type; }
+          if (tpl.filiere) { pick(segF, tpl.filiere, filAutre); filiere = tpl.filiere; }
+          if (tpl.duree) { const db=[...segD.querySelectorAll("button")].find(x=>x.dataset.v===String(tpl.duree));
+            segD.querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+            if (db) db.classList.add("on");
+            else { segD.querySelector('[data-v="__autre"]').classList.add("on"); durAutre.classList.remove("hidden"); durH.value=Math.floor(tpl.duree/60); durM.value=tpl.duree%60-(tpl.duree%60)%5; }
+            duree = tpl.duree; }
+          if (Array.isArray(tpl.jours)) { tpl.jours.forEach(j=>jours.push({...j})); recolor(); }
+          renderList(); valide();
+          toast("Modèle repris — ajustez puis « Créer ».");
+        }
+      } catch(e) {}
     }
 
     // ===================================================================  2) VUE TUTEUR
@@ -492,7 +518,8 @@
               <div class="row"><span class="k">Type</span><span class="v">${esc(d.type)} · ${d.duree} min</span></div></div>
             <div style="margin-bottom:14px">${statutHtml}</div>
             ${corps}
-            <button class="cta ghost" id="nouveau" style="margin-top:16px">Créer un autre rendez-vous</button>
+            <button class="cta ghost" id="dupliquer" style="margin-top:16px">Dupliquer (réutiliser comme modèle)</button>
+            <button class="cta ghost" id="nouveau" style="margin-top:10px">Créer un autre rendez-vous</button>
             <button class="cta danger" id="suppr" style="margin-top:10px">Supprimer ce rendez-vous</button>
             <div id="suppr-zone"></div>
             <a class="cta ghost" href="${PORTAIL}" style="display:block;text-decoration:none;margin-top:10px">← Retour au portail</a>
@@ -507,6 +534,9 @@
           const body=encodeURIComponent((document.getElementById("confmsg")||{}).value||"");
           location.href=`mailto:${to}?subject=${encodeURIComponent("Confirmation rendez-vous PFMP")}&body=${body}`; });
         bind("nouveau", ()=>{ location.search=""; });
+        bind("dupliquer", ()=>{ sessionStorage.setItem("coordrdv_tpl", JSON.stringify({
+          enseignant:d.enseignant||"", tuteur:d.tuteur||"", tuteurEmail:d.tuteurEmail||"", entreprise:d.entreprise||"",
+          filiere:d.filiere||"", type:d.type||"", duree:d.duree||45, jours:d.jours||[] })); location.search=""; });
         bind("rouvrir", async()=>{ await updateDoc(doc(db,COL,id),{confirme:null, statut:"repondu"}); });
         bind("suppr", ()=>{ const z=document.getElementById("suppr-zone"); const b=document.getElementById("suppr");
           b.style.display="none";
