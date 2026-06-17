@@ -209,7 +209,14 @@
       u.searchParams.set("dates",dtICS(c.dateStr,c.start)+"/"+dtICS(c.dateStr,c.end));
       u.searchParams.set("details","Visite de stage (PFMP)"+(d.enseignant?" avec "+d.enseignant:"")); u.searchParams.set("location",d.entreprise); return u.toString(); }
     function defaultMsg(d,url){ const c=d.confirme;
-      return `Bonjour${d.tuteur?" "+d.tuteur:""},\n\nJe vous confirme notre rendez-vous pour la visite de PFMP :\n${c.jour}, de ${c.label}\nLieu : ${d.entreprise}\n\nVous pouvez voir la confirmation et l'ajouter à votre agenda ici :\n${url}\n\nBien cordialement${d.enseignant?",\n"+d.enseignant:""}`; }
+      return `Bonjour${d.tuteur?" "+d.tuteur:""},\n\n`
+        + `Je vous confirme notre rendez-vous pour la visite de PFMP :\n\n`
+        + `${c.jour}, de ${fmtH(c.start)} à ${fmtH(c.end)}\n\n`
+        + `Lieu : ${d.entreprise}\n\n`
+        + `Ce rendez-vous permettra de faire le point sur la période de formation en milieu professionnel de l'élève, en lien avec les activités réalisées, son intégration et les éléments utiles au suivi de la formation.\n\n`
+        + `En cas d'impossibilité ou de changement, merci de me prévenir dès que possible.\n\n`
+        + `Pour ajouter ce rendez-vous à votre agenda : ${url}\n\n`
+        + `Bien cordialement,${d.enseignant?"\n"+d.enseignant:""}`; }
 
     // ---- chargement robuste (1 nouvelle tentative) ----
     async function getRdv(id){ try{ return await getDoc(doc(db,COL,id)); }
