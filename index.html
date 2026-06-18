@@ -380,7 +380,20 @@
             duree = tpl.duree; }
           if (Array.isArray(tpl.jours)) { tpl.jours.forEach(j=>jours.push({...j})); recolor(); }
           renderList(); valide();
-          toast("Modèle repris — ajustez puis « Créer ».");
+          if (tpl._edit) {
+            document.querySelector(".top h1").textContent = "Modifier le rendez-vous";
+            const eb=document.getElementById("creer"); eb.textContent="Enregistrer les modifications";
+            eb.onclick=async()=>{ eb.disabled=true; eb.textContent="Enregistrement…";
+              try{ await updateDoc(doc(db,COL,tpl._edit),{ enseignant:document.getElementById("f-ens").value.trim(),
+                tuteur:document.getElementById("f-tut").value.trim(), tuteurEmail:document.getElementById("f-temail").value.trim(),
+                entreprise:entEl.value.trim(), filiere, type, duree,
+                jours:jours.map(j=>({dateStr:j.dateStr,jour:j.jour,d:j.d,m:j.m,start:j.start,end:j.end,col:j.col})) });
+                location.search="?r="+tpl._edit;
+              }catch(e){ eb.disabled=false; eb.textContent="Enregistrer les modifications"; toast("Erreur. Réessayez."); } };
+            toast("Modifiez puis « Enregistrer ».");
+          } else {
+            toast("Modèle repris — ajustez puis « Créer ».");
+          }
         }
       } catch(e) {}
     }
@@ -518,7 +531,8 @@
               <div class="row"><span class="k">Type</span><span class="v">${esc(d.type)} · ${d.duree} min</span></div></div>
             <div style="margin-bottom:14px">${statutHtml}</div>
             ${corps}
-            <button class="cta ghost" id="dupliquer" style="margin-top:16px">Dupliquer (réutiliser comme modèle)</button>
+            ${(!prefs.length && !confirme) ? `<button class="cta ghost" id="modifier" style="margin-top:16px">Modifier ce rendez-vous</button>` : ``}
+            <button class="cta ghost" id="dupliquer" style="margin-top:10px">Dupliquer (réutiliser comme modèle)</button>
             <button class="cta ghost" id="nouveau" style="margin-top:10px">Créer un autre rendez-vous</button>
             <button class="cta danger" id="suppr" style="margin-top:10px">Supprimer ce rendez-vous</button>
             <div id="suppr-zone"></div>
@@ -536,6 +550,9 @@
         bind("nouveau", ()=>{ location.search=""; });
         bind("dupliquer", ()=>{ sessionStorage.setItem("coordrdv_tpl", JSON.stringify({
           enseignant:d.enseignant||"", tuteur:d.tuteur||"", tuteurEmail:d.tuteurEmail||"", entreprise:d.entreprise||"",
+          filiere:d.filiere||"", type:d.type||"", duree:d.duree||45, jours:d.jours||[] })); location.search=""; });
+        bind("modifier", ()=>{ sessionStorage.setItem("coordrdv_tpl", JSON.stringify({
+          _edit:id, enseignant:d.enseignant||"", tuteur:d.tuteur||"", tuteurEmail:d.tuteurEmail||"", entreprise:d.entreprise||"",
           filiere:d.filiere||"", type:d.type||"", duree:d.duree||45, jours:d.jours||[] })); location.search=""; });
         bind("rouvrir", async()=>{ await updateDoc(doc(db,COL,id),{confirme:null, statut:"repondu"}); });
         bind("suppr", ()=>{ const z=document.getElementById("suppr-zone"); const b=document.getElementById("suppr");
