@@ -378,7 +378,8 @@
             if (db) db.classList.add("on");
             else { segD.querySelector('[data-v="__autre"]').classList.add("on"); durAutre.classList.remove("hidden"); durH.value=Math.floor(tpl.duree/60); durM.value=tpl.duree%60-(tpl.duree%60)%5; }
             duree = tpl.duree; }
-          if (Array.isArray(tpl.jours)) { tpl.jours.forEach(j=>jours.push({...j})); recolor(); }
+          if (Array.isArray(tpl.jours)) { tpl.jours.forEach(j=>jours.push({...j}));
+            jours.sort((a,b)=> a.dateStr.localeCompare(b.dateStr) || a.start-b.start); recolor(); }
           renderList(); valide();
           if (tpl._edit) {
             document.querySelector(".top h1").textContent = "Modifier le rendez-vous";
