@@ -158,7 +158,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp }
+    import { getFirestore, collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, serverTimestamp }
       from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -231,7 +231,7 @@
       catch(e){ return erreur("Connexion impossible pour le moment. Vérifiez votre réseau puis rechargez la page.", true); }
       if(!snap.exists()) return erreur("Ce lien de rendez-vous n'existe pas ou a été supprimé.");
       const data = snap.data();
-      if(localStorage.getItem(lsAdmin(rid))) return vueGestion(rid, data);
+      if(params.has("gestion") || localStorage.getItem(lsAdmin(rid))) return vueGestion(rid, data);
       return vueTuteur(rid, data);
     }
     const erreur = (msg,reload) => { app$.innerHTML = `<div class="center"><p style="font-size:1.05rem;color:var(--ink)">${esc(msg)}</p>
@@ -354,7 +354,7 @@
           entreprise:entEl.value.trim(), filiere, type, duree,
           jours:jours.map(j=>({dateStr:j.dateStr,jour:j.jour,d:j.d,m:j.m,start:j.start,end:j.end,col:j.col})),
           choix:null, confirme:null, statut:"attente", createdAt:serverTimestamp() };
-        try{ const ref=await addDoc(collection(db,COL),payload); localStorage.setItem(lsAdmin(ref.id),"1"); location.search="?r="+ref.id; }
+        try{ const ref=await addDoc(collection(db,COL),payload); localStorage.setItem(lsAdmin(ref.id),"1"); location.search="?r="+ref.id+"&gestion=1"; }
         catch(e){ btn.disabled=false; btn.textContent="Créer et obtenir le lien"; toast("Erreur à l'enregistrement. Réessayez."); }
       };
 
@@ -389,7 +389,7 @@
                 tuteur:document.getElementById("f-tut").value.trim(), tuteurEmail:document.getElementById("f-temail").value.trim(),
                 entreprise:entEl.value.trim(), filiere, type, duree,
                 jours:jours.map(j=>({dateStr:j.dateStr,jour:j.jour,d:j.d,m:j.m,start:j.start,end:j.end,col:j.col})) });
-                location.search="?r="+tpl._edit;
+                location.search="?r="+tpl._edit+"&gestion=1";
               }catch(e){ eb.disabled=false; eb.textContent="Enregistrer les modifications"; toast("Erreur. Réessayez."); } };
             toast("Modifiez puis « Enregistrer ».");
           } else {
@@ -575,16 +575,16 @@
     // ===================================================================  4) SUIVI
     async function vueSuivi(){
       const selF = params.get("f");
-      const ids=Object.keys(localStorage).filter(k=>k.startsWith("coordrdv_admin_")).map(k=>k.slice("coordrdv_admin_".length));
       app$.innerHTML=`<div class="top">${selF!==null?`<a class="back" href="?suivi">← Filières</a>`:`<a class="back" href="${PORTAIL}">← Portail</a>`}
-        <div class="label">Espace de gestion${selF!==null?" · filière":""}</div><h1>${selF!==null?esc(selF):"Mes rendez-vous PFMP"}</h1></div>
+        <div class="label">Espace de gestion${selF!==null?" · filière":""}</div><h1>${selF!==null?esc(selF):"Tous les rendez-vous PFMP"}</h1></div>
         <div class="body" id="liste"><div class="center"><div class="spin"></div>Chargement…</div></div>`;
       const liste=document.getElementById("liste");
-      if(!ids.length){ liste.innerHTML=`<p class="sub" style="font-size:.92rem">Aucun rendez-vous pour l'instant.</p><button class="cta" id="nouv">Créer un rendez-vous</button>`;
+      let all=[];
+      try { const snaps=await getDocs(collection(db,COL)); all=snaps.docs.map(s=>({id:s.id,...s.data()})); }
+      catch(e){ liste.innerHTML=`<p class="sub" style="font-size:.92rem">Connexion impossible pour le moment. Rechargez la page.</p>`; return; }
+      if(!all.length){ liste.innerHTML=`<p class="sub" style="font-size:.92rem">Aucun rendez-vous pour l'instant.</p><button class="cta" id="nouv">Créer un rendez-vous</button>`;
         document.getElementById("nouv").onclick=()=>{ location.search=""; }; return; }
-      const docs=await Promise.all(ids.map(async id=>{ try{ const s=await getRdv(id); return s.exists()?{id,...s.data()}:null; }catch(e){ return null; } }));
       const today=new Date(); today.setHours(0,0,0,0);
-      const all=docs.filter(Boolean);
       const isPast=d=>d.confirme && new Date(d.confirme.dateStr+"T00:00:00")<today;
       const filVal=d=>d.filiere||"Sans filière";
       const fmtCree = ts => { if(!ts||!ts.seconds) return ""; const x=new Date(ts.seconds*1000);
@@ -595,7 +595,7 @@
         else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Pas encore de réponse`; }
         const mail=(d.choix&&d.choix.contact&&d.choix.contact.value)||d.tuteurEmail||"";
         const cree=fmtCree(d.createdAt);
-        return `<a class="item ${past?"past":""}" href="?r=${d.id}"><div class="l1"><span class="ent">${esc(d.entreprise)}</span>${chip}</div>
+        return `<a class="item ${past?"past":""}" href="?r=${d.id}&gestion=1"><div class="l1"><span class="ent">${esc(d.entreprise)}</span>${chip}</div>
           ${mail?`<div class="l2 mail">${esc(mail)}</div>`:""}
           <div class="l3">${d.tuteur?esc(d.tuteur)+" · ":""}${info}</div>
           ${cree?`<div class="l3" style="opacity:.7">${cree}</div>`:""}</a>`; };
