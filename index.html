@@ -587,14 +587,18 @@
       const all=docs.filter(Boolean);
       const isPast=d=>d.confirme && new Date(d.confirme.dateStr+"T00:00:00")<today;
       const filVal=d=>d.filiere||"Sans filière";
+      const fmtCree = ts => { if(!ts||!ts.seconds) return ""; const x=new Date(ts.seconds*1000);
+        return "créé le "+x.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" à "+pad(x.getHours())+" h "+pad(x.getMinutes()); };
       const carte=d=>{ let chip,info; const past=isPast(d);
         if(d.confirme){ chip=`<span class="status ok" style="margin-left:auto"><span class="pin"></span>${past?"Passé":"Confirmé"}</span>`; info=`${esc(d.confirme.jour)} · ${esc(d.confirme.label)}`; }
         else if(d.choix&&d.choix.prefs&&d.choix.prefs.length){ chip=`<span class="status rep" style="margin-left:auto"><span class="pin"></span>À confirmer</span>`; info=`${d.choix.prefs.length} préférence${d.choix.prefs.length>1?"s":""} reçue${d.choix.prefs.length>1?"s":""}`; }
-        else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Lien envoyé — pas encore de réponse`; }
+        else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Pas encore de réponse`; }
         const mail=(d.choix&&d.choix.contact&&d.choix.contact.value)||d.tuteurEmail||"";
+        const cree=fmtCree(d.createdAt);
         return `<a class="item ${past?"past":""}" href="?r=${d.id}"><div class="l1"><span class="ent">${esc(d.entreprise)}</span>${chip}</div>
           ${mail?`<div class="l2 mail">${esc(mail)}</div>`:""}
-          <div class="l3">${d.tuteur?esc(d.tuteur)+" · ":""}${info}</div></a>`; };
+          <div class="l3">${d.tuteur?esc(d.tuteur)+" · ":""}${info}</div>
+          ${cree?`<div class="l3" style="opacity:.7">${cree}</div>`:""}</a>`; };
       const sortKey=d=>d.confirme?new Date(d.confirme.dateStr).getTime():(1e15-(d.createdAt?.seconds||0));
 
       // rubriques = filières (dossiers)
