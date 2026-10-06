@@ -158,14 +158,15 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, serverTimestamp }
+    import { getFirestore, collection, addDoc, doc, getDoc, getDocs, updateDoc, onSnapshot, serverTimestamp, runTransaction }
       from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+    // 06/10/2026 : la coordination vit dans « coordination-pedagogie » (les rendez-vous y ont été recopiés le 27/09).
     const firebaseConfig = {
-      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
-      authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse",
-      storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904",
-      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+      apiKey: "AIzaSyBj_GXG8ln3GAxNXxiJkT2HPSWIHJpc1lA",
+      authDomain: "coordination-pedagogie.firebaseapp.com", projectId: "coordination-pedagogie",
+      storageBucket: "coordination-pedagogie.firebasestorage.app", messagingSenderId: "526058585010",
+      appId: "1:526058585010:web:ba4dd6d9c8281ba5bf02ab"
     };
     const db = getFirestore(initializeApp(firebaseConfig));
     const COL = "coordination_rdv";
@@ -176,6 +177,19 @@
     const rid = params.get("r");
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
     const lsAdmin = id => "coordrdv_admin_" + id;
+    // Lien avec « Suivre mes élèves en PFMP » : ?pfmp=2026-2027_K4A7_p1&filiere=AGOrA
+    // Le rendez-vous ne garde aucun code d'élève ; c'est la fiche PFMP qui garde le numéro du rendez-vous.
+    const PFMP = /^20\d{2}-20\d{2}_[A-Z0-9]{4,6}_p[1-4]$/.test(params.get("pfmp")||"") ? params.get("pfmp") : "";
+    async function lierAuSuivi(rdvId, type){
+      if(!PFMP) return;
+      const ref = doc(db, "coordination_pfmp_suivi", PFMP);
+      await runTransaction(db, async t => {
+        const s = await t.get(ref); if(!s.exists()) return;
+        const d = s.data();
+        t.set(ref, Object.assign({}, d, { visite:{ rdv:rdvId, statut:"attente", type:String(type||"").slice(0,40), le:"" },
+          majLe:new Date().toISOString(), majPar:"referent", version:(d.version||0)+1 }));
+      });
+    }
     let toastT;
     const toast = m => { const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show");
       clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2200); };
@@ -231,6 +245,7 @@
       catch(e){ return erreur("Connexion impossible pour le moment. Vérifiez votre réseau puis rechargez la page.", true); }
       if(!snap.exists()) return erreur("Ce lien de rendez-vous n'existe pas ou a été supprimé.");
       const data = snap.data();
+      if(data.statut==="annule" && !(params.has("gestion") || localStorage.getItem(lsAdmin(rid)))) return erreur("Ce rendez-vous a été annulé par l'enseignant.");
       if(params.has("gestion") || localStorage.getItem(lsAdmin(rid))) return vueGestion(rid, data);
       return vueTuteur(rid, data);
     }
@@ -248,6 +263,7 @@
         <div class="top"><a class="back" href="${PORTAIL}">← Portail</a>
           <div class="label">PFMP · visite de stage</div><h1>Proposer une date au tuteur</h1></div>
         <div class="body">
+          ${PFMP?`<div class="hint" style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fdf1e3;color:#7c3a06">Rendez-vous lié au suivi PFMP de l'élève <b>${esc(PFMP.split("_")[1])}</b> : la date confirmée apparaîtra dans son parcours.</div>`:""}
           <div class="field"><label>Structure / entreprise</label><input id="f-ent" placeholder="ex. Centre social Les Tilleuls"></div>
           <div class="field"><label>Filière <span style="font-weight:400;color:var(--soft)">— pour ranger vos rendez-vous</span></label>
             <div class="seg" id="seg-fil">
@@ -307,6 +323,8 @@
         if(b.dataset.v==="__autre"){ filAutre.classList.remove("hidden"); filAutre.focus(); filiere=filAutre.value.trim(); }
         else { filAutre.classList.add("hidden"); filiere=b.dataset.v; } });
       filAutre.addEventListener("input",()=>{ filiere=filAutre.value.trim(); });
+      const filParam=params.get("filiere")||"";
+      if(PFMP && filParam){ const bf=[...segF.querySelectorAll("button")].find(x=>x.dataset.v===filParam); if(bf){ bf.click(); } }
 
       let duree=45;
       const segD=document.getElementById("seg-dur"), durAutre=document.getElementById("dur-autre"),
@@ -354,7 +372,9 @@
           entreprise:entEl.value.trim(), filiere, type, duree,
           jours:jours.map(j=>({dateStr:j.dateStr,jour:j.jour,d:j.d,m:j.m,start:j.start,end:j.end,col:j.col})),
           choix:null, confirme:null, statut:"attente", createdAt:serverTimestamp() };
-        try{ const ref=await addDoc(collection(db,COL),payload); localStorage.setItem(lsAdmin(ref.id),"1"); location.search="?r="+ref.id+"&gestion=1"; }
+        try{ const ref=await addDoc(collection(db,COL),payload); localStorage.setItem(lsAdmin(ref.id),"1");
+          try{ await lierAuSuivi(ref.id, type); }catch(e){ console.warn("Lien avec le suivi PFMP impossible", e); }
+          location.search="?r="+ref.id+"&gestion=1"; }
         catch(e){ btn.disabled=false; btn.textContent="Créer et obtenir le lien"; toast("Erreur à l'enregistrement. Réessayez."); }
       };
 
@@ -523,6 +543,7 @@
             <div class="link-box"><input id="lien" readonly value="${esc(url)}"><button class="copy" id="copy">Copier</button></div>
             <p class="hint" style="margin-top:6px">À coller dans votre e-mail au tuteur. Aucun compte à créer pour lui. Cette page se met à jour dès qu'il répond.</p>`;
         }
+        if(d.statut==="annule") statutHtml=`<span class="status wait"><span class="pin"></span>Annulé</span>`;
         app$.innerHTML = `
           <div class="top"><a class="back" href="?suivi">← Mes rendez-vous</a><div class="label">Visite de stage</div><h1>${esc(d.entreprise)}</h1></div>
           <div class="body">
@@ -535,7 +556,9 @@
             ${(!prefs.length && !confirme) ? `<button class="cta ghost" id="modifier" style="margin-top:16px">Modifier ce rendez-vous</button>` : ``}
             <button class="cta ghost" id="dupliquer" style="margin-top:10px">Dupliquer (réutiliser comme modèle)</button>
             <button class="cta ghost" id="nouveau" style="margin-top:10px">Créer un autre rendez-vous</button>
-            <button class="cta danger" id="suppr" style="margin-top:10px">Supprimer ce rendez-vous</button>
+            ${d.statut==="annule"
+              ? `<button class="cta ghost" id="retablir" style="margin-top:10px">Rétablir ce rendez-vous</button>`
+              : `<button class="cta danger" id="suppr" style="margin-top:10px">Annuler ce rendez-vous</button>`}
             <div id="suppr-zone"></div>
             <a class="cta ghost" href="${PORTAIL}" style="display:block;text-decoration:none;margin-top:10px">← Retour au portail</a>
           </div>`;
@@ -558,13 +581,15 @@
         bind("rouvrir", async()=>{ await updateDoc(doc(db,COL,id),{confirme:null, statut:"repondu"}); });
         bind("suppr", ()=>{ const z=document.getElementById("suppr-zone"); const b=document.getElementById("suppr");
           b.style.display="none";
-          z.innerHTML=`<div class="confirmbox"><p>Supprimer définitivement ce rendez-vous ? Cette action est irréversible.</p>
-            <div class="row2"><button class="ghost" id="sa">Annuler</button><button class="danger-solid" id="sok">Oui, supprimer</button></div></div>`;
+          z.innerHTML=`<div class="confirmbox"><p>Annuler ce rendez-vous ? Le lien du tuteur affichera « annulé ». Vous pourrez le rétablir.</p>
+            <div class="row2"><button class="ghost" id="sa">Garder</button><button class="danger-solid" id="sok">Oui, annuler</button></div></div>`;
           document.getElementById("sa").onclick=()=>{ z.innerHTML=""; b.style.display=""; };
-          document.getElementById("sok").onclick=async()=>{ document.getElementById("sok").textContent="Suppression…";
-            try{ await deleteDoc(doc(db,COL,id)); localStorage.removeItem(lsAdmin(id)); location.search="?suivi"; }
-            catch(e){ toast("Erreur lors de la suppression."); } };
+          document.getElementById("sok").onclick=async()=>{ document.getElementById("sok").textContent="Annulation…";
+            try{ await updateDoc(doc(db,COL,id),{ statut:"annule", annuleLe:serverTimestamp() }); location.search="?suivi"; }
+            catch(e){ toast("Erreur lors de l'annulation."); } };
         });
+        bind("retablir", async()=>{ try{ await updateDoc(doc(db,COL,id),{ statut: d.confirme?"confirme":(d.choix&&d.choix.prefs&&d.choix.prefs.length?"repondu":"attente") }); toast("Rendez-vous rétabli."); }
+          catch(e){ toast("Erreur : rendez-vous non rétabli."); } });
         app$.querySelectorAll(".pref[data-i]").forEach(b=>b.onclick=async()=>{ const p=prefs[+b.dataset.i];
           await updateDoc(doc(db,COL,id),{ confirme:p, statut:"confirme", confirmedAt:serverTimestamp() }); toast("✓ Rendez-vous confirmé !"); });
       }
@@ -590,7 +615,8 @@
       const fmtCree = ts => { if(!ts||!ts.seconds) return ""; const x=new Date(ts.seconds*1000);
         return "créé le "+x.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" à "+pad(x.getHours())+" h "+pad(x.getMinutes()); };
       const carte=d=>{ let chip,info; const past=isPast(d);
-        if(d.confirme){ chip=`<span class="status ok" style="margin-left:auto"><span class="pin"></span>${past?"Passé":"Confirmé"}</span>`; info=`${esc(d.confirme.jour)} · ${esc(d.confirme.label)}`; }
+        if(d.statut==="annule"){ chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>Annulé</span>`; info=`Rendez-vous annulé`; }
+        else if(d.confirme){ chip=`<span class="status ok" style="margin-left:auto"><span class="pin"></span>${past?"Passé":"Confirmé"}</span>`; info=`${esc(d.confirme.jour)} · ${esc(d.confirme.label)}`; }
         else if(d.choix&&d.choix.prefs&&d.choix.prefs.length){ chip=`<span class="status rep" style="margin-left:auto"><span class="pin"></span>À confirmer</span>`; info=`${d.choix.prefs.length} préférence${d.choix.prefs.length>1?"s":""} reçue${d.choix.prefs.length>1?"s":""}`; }
         else { chip=`<span class="status wait" style="margin-left:auto"><span class="pin"></span>En attente</span>`; info=`Pas encore de réponse`; }
         const mail=(d.choix&&d.choix.contact&&d.choix.contact.value)||d.tuteurEmail||"";
